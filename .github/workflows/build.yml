@@ -1,0 +1,85 @@
+name: Build and push a docker container to ECR
+
+on:
+  push:
+    branches:    
+      - 'main'
+
+jobs:
+  buildAnddeployDev:
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      actions: read
+      checks: read
+      deployments: read
+      issues: read
+      discussions: read
+      packages: write
+      pages: read
+      repository-projects: read
+      security-events: read
+      statuses: read
+    runs-on: ubuntu-latest
+    env:
+        SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+    steps:
+    - name: set environment variables
+      id: env
+      run: |
+        echo ::set-output name=container_name::tenthplanet
+        echo ::set-output name=service_name::tenthplanet
+        echo ::set-output name=tag::$(date +%s)
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Checkout lonsdaledm/github-actions
+      uses: actions/checkout@v3
+      with:
+        repository: lonsdaledm/github-actions
+        ref: refs/heads/main
+        token: ${{ secrets.QUARTERBACK_GITHUB_TOKEN }}
+        persist-credentials: false
+        path: ./.github/actions/opto
+
+    - name: Build docker image
+      run: |
+        docker build . --tag ${{ steps.env.outputs.container_name }}:${{ steps.env.outputs.tag }}
+
+    - name: Push container
+      uses: ./.github/actions/opto/push-container
+      id: push
+      with:
+        source: ${{ steps.env.outputs.container_name }}:${{ steps.env.outputs.tag }}
+        name: 10thplanet
+        tag: ${{ steps.env.outputs.tag }}
+
+    - name: Deploy to dev (k8s)
+      id: deploy-k8s
+      uses: ./.github/actions/opto/deploy-k8s
+      with:
+        namespace: dev
+        service: ${{ steps.env.outputs.container_name }}
+        tag: ${{ steps.env.outputs.tag }}
+
+    - name: Post to a Slack channel
+      id: slack
+      if: always()
+      uses: slackapi/slack-github-action@v1.16.0
+      with:
+        channel-id: 'deploy-alerts'
+        payload: |
+          {
+            "text": "GitHub Action build result for ${{ github.event.repository.name }}: ${{ job.status }}",
+
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "GitHub Action build result for **${{ github.event.repository.name }}**: ${{ job.status }}"
+                }
+              }
+            ]
+          }

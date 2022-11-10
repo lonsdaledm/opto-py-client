@@ -1,0 +1,14 @@
+aws:
+  account_id: "063985724809"
+  region: us-east-2
+  vpc_id: vpc-06183d38c09444c18
+
+eks:
+  cluster_id: CC6E1EE4063DF8D11B26CC64329ACA71
+
+opto:
+  scope: dev
+
+securityGroups:
+  service:
+  - sg-0b72ac7b2508d6517 # Fargate General

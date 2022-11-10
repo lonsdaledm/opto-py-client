@@ -1,0 +1,51 @@
+{{- if ne .Values.opto.scope "local" -}}
+apiVersion: manageddeployment.optoinvest.com/v1alpha1
+kind: ManagedDeployment
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    {{- include "tenthplanet-service.labels" . | nindent 4 }}
+spec:
+  podPolicy:
+    spec:
+      podSelector:
+        matchLabels:
+          {{- include "tenthplanet-service.labels" . | nindent 10 }}
+      securityGroups:
+        groupIds:
+        - {{ .Release.Namespace }}-{{ .Chart.Name }}
+        {{- range .Values.securityGroups.service }}
+        - {{.}}
+        {{- end }}
+  embeddedSecurityGroups:
+    items:
+    - spec:
+        name: {{ .Release.Namespace }}-{{ .Chart.Name }}
+        description: "[{{ .Release.Namespace }}] {{ .Chart.Name }} service"
+        vpcID: {{ .Values.aws.vpc_id }}
+        ingressRules: 
+        - fromPort: 8080
+          toPort: 8080
+          ipProtocol: "tcp"
+          userIDGroupPairs:
+          - groupName: {{ .Release.Namespace }}-xlb
+            vpcID: {{ .Values.aws.vpc_id }}
+            description: "Permit ingress from load balancer"
+    - spec:
+        name: {{ .Release.Namespace }}-{{ .Chart.Name }}-db
+        description: "[{{ .Release.Namespace }}] {{ .Chart.Name }} database"
+        vpcID: {{ .Values.aws.vpc_id }}
+        ingressRules: 
+        - fromPort: 5432
+          toPort: 5432
+          ipProtocol: "tcp"
+          userIDGroupPairs:
+          - groupName: {{ .Release.Namespace }}-{{ .Chart.Name }}
+            vpcID: {{ .Values.aws.vpc_id }}
+            description: "Permit ingress from {{ .Chart.Name }}"
+          - groupID: sg-0f75f332c733c2914
+            description: "Permit ingress from vpn clients"
+            # This is always the dev VPC
+            vpcID: vpc-06183d38c09444c18
+    
+{{- end }}

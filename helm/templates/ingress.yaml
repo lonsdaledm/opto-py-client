@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Chart.Name }}
+  annotations:
+    alb.ingress.kubernetes.io/group.name: {{ .Release.Namespace }}
+    alb.ingress.kubernetes.io/security-groups: {{ .Release.Namespace }}-xlb
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/load-balancer-attributes: access_logs.s3.enabled=true,access_logs.s3.bucket=awslogs.us-east-2.dev.optoinvest.com,routing.http.drop_invalid_header_fields.enabled=true,routing.http2.enabled=true,routing.http.preserve_host_header.enabled=true,idle_timeout.timeout_seconds=60
+    # ,deletion_protection.enabled=true
+    alb.ingress.kubernetes.io/tags: Scope={{ .Release.Namespace }}
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30
+    # alb.ingress.kubernetes.io/ip-address-type: dualstack
+    # external-dns.alpha.kubernetes.io/hostname
+
+spec:
+  ingressClassName: alb
+  tls:
+    - hosts:
+      - k8s-tenthplanets.{{ .Release.Namespace }}.optoinvest.com
+  rules:
+    - host: k8s-tenthplanets.{{ .Release.Namespace }}.optoinvest.com
+      http:
+        paths:
+          - path: "/*"
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ .Chart.Name }}
+                port:
+                  number: {{ .Values.service.port -}}

@@ -1,0 +1,6 @@
+venv
+config/.secrets
+.idea
+*.pyc
+.DS_Store
+.venv

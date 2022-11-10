@@ -1,0 +1,88 @@
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Policy
+metadata:
+  name: {{ include "opto.role-name" . }}
+spec:
+  name: {{ include "opto.role-name" . }}
+  description: Managed policies for {{ include "opto.role-name" . }}
+  policyDocument: >
+    { 
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Action": [
+              "secretsmanager:GetSecretValue"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+              "arn:aws:secretsmanager:*:*:secret:/opto/{{ .Release.Namespace }}/{{ .Chart.Name }}/*",
+              "arn:aws:secretsmanager:*:*:secret:/opto/{{ .Release.Namespace }}/shared/*",
+              "arn:aws:secretsmanager:*:*:secret:/opto/global/*",
+              "arn:aws:secretsmanager:*:*:secret:/opto/shared/*"
+          ]
+      },
+      {
+          "Action": [
+              "secretsmanager:ListSecrets",
+              "ssmmessages:CreateControlChannel",
+              "ssmmessages:CreateDataChannel",
+              "ssmmessages:OpenControlChannel",
+              "ssmmessages:OpenDataChannel"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+              "*"
+          ]
+      },
+      {
+          "Action": [
+              "ssm:GetParametersByPath"
+          ],
+          "Effect": "Allow",
+          "Resource": [
+              "arn:aws:ssm:*:*:parameter/opto/shared/*",
+              "arn:aws:ssm:*:*:parameter/opto/global/environment/*",
+              "arn:aws:ssm:*:*:parameter/opto/{{ .Release.Namespace }}/environment/*",
+              "arn:aws:ssm:*:*:parameter/opto/{{ .Release.Namespace }}/{{ .Chart.Name }}/environment/*"
+          ]
+      }
+      ]
+    }
+
+  tags:
+    - key: tag1
+      value: val1
+
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: {{ include "opto.role-name" . }}
+spec:
+  name: {{ include "opto.role-name" . }}
+  description: Role for {{ .Chart.Name }}
+  maxSessionDuration: 3600
+  assumeRolePolicyDocument: >
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Federated": "arn:aws:iam::{{ .Values.aws.account_id }}:oidc-provider/oidc.eks.{{ .Values.aws.region }}.amazonaws.com/id/{{ .Values.eks.cluster_id }}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                    "StringEquals": {
+                        "oidc.eks.{{ .Values.aws.region }}.amazonaws.com/id/{{ .Values.eks.cluster_id }}:aud": "sts.amazonaws.com",
+                        "oidc.eks.{{ .Values.aws.region }}.amazonaws.com/id/{{ .Values.eks.cluster_id }}:sub": "system:serviceaccount:{{ .Release.Namespace }}:{{ .Chart.Name }}"
+                    }
+                }
+            }
+          ]
+        }
+  policies:
+    - {{ include "opto.role-name" . | printf "arn:aws:iam::%s:policy/%s" .Values.aws.account_id | quote }}
+  tags:
+    - key: tag1
+      value: val1
